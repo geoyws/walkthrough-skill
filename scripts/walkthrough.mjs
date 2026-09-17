@@ -525,13 +525,28 @@ function listSubmodules(repo) {
   });
 }
 
+// Pathspec that hides the walkthrough from "did the code change" questions.
+// The stamp describes the code; edits to the walkthrough itself are not code,
+// so they must neither mark the tree dirty nor make the stamp stale.
+const NOT_SITE = `:(exclude)${SITE}`;
+
 function rootState(repo) {
   const sha = gitTry(['rev-parse', 'HEAD'], repo);
   if (!sha) die('not a git repository (or no commits yet)');
   const branch = (gitTry(['rev-parse', '--abbrev-ref', 'HEAD'], repo) || '').trim();
-  const dirty = (gitTry(['status', '--porcelain'], repo) || '').trim().length > 0;
+  const dirty = (gitTry(['status', '--porcelain', '--', '.', NOT_SITE], repo) || '').trim().length > 0;
   const full = sha.trim();
   return { sha: full, short: full.slice(0, 10), branch: branch || 'HEAD', dirty };
+}
+
+// True when every difference between the stamped commit and HEAD lies under
+// docs/walkthrough — i.e. the only commits since the stamp are the walkthrough
+// being committed. Without this a refresh could never be FRESH once committed,
+// because the commit that records the stamp necessarily moves HEAD past it.
+function onlySiteChangedSince(repo, stampedSha) {
+  if (!stampedSha || gitTry(['cat-file', '-e', `${stampedSha}^{commit}`], repo) === null) return false;
+  const out = gitTry(['diff', '--name-only', stampedSha, 'HEAD', '--', '.', NOT_SITE], repo);
+  return out !== null && out.trim().length === 0;
 }
 
 function stamp() {
@@ -936,9 +951,14 @@ function cmdCheck(repo) {
   }
   const root = rootState(repo);
   const lines = [];
+  let note = '';
   if (!manifest.root || manifest.root.sha !== root.sha) {
     const was = manifest.root ? manifest.root.short : 'none';
-    lines.push(`STALE . ${was} -> ${root.short}`);
+    if (manifest.root && onlySiteChangedSince(repo, manifest.root.sha)) {
+      note = ` (HEAD ${root.short} differs only under ${SITE})`;
+    } else {
+      lines.push(`STALE . ${was} -> ${root.short}`);
+    }
   }
   const live = new Map(listSubmodules(repo).map((s) => [s.path, s.sha]));
   for (const sub of manifest.submodules || []) {
@@ -954,7 +974,7 @@ function cmdCheck(repo) {
     process.stdout.write(`${lines.join('\n')}\n`);
     return 1;
   }
-  process.stdout.write(`FRESH ${manifest.root.short}\n`);
+  process.stdout.write(`FRESH ${manifest.root.short}${note}\n`);
   return 0;
 }
 

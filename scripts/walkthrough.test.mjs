@@ -157,6 +157,35 @@ test('check goes STALE after a commit and FRESH again after refresh', () => {
   assert.equal(manifest.previous.rootSha, before);
 });
 
+test('committing the walkthrough itself does not make its own stamp stale', () => {
+  const repo = fixture();
+  assert.equal(wt(['init'], repo).status, 0);
+  git(['add', '-A'], repo);
+  git(['commit', '-m', 'chore: wire walkthrough'], repo); // init touched package.json, which is code
+  assert.equal(wt(['refresh'], repo).status, 0);
+  const stamped = git(['rev-parse', 'HEAD'], repo);
+  const manifest = JSON.parse(fs.readFileSync(path.join(repo, 'docs/walkthrough/manifest.json'), 'utf8'));
+  // the uncommitted refreshed walkthrough is not code, so the stamped tree is clean
+  assert.equal(manifest.root.sha, stamped);
+  assert.equal(manifest.root.dirty, false);
+
+  fs.appendFileSync(path.join(repo, 'docs/walkthrough/index.md'), '\nMore narrative.\n');
+  git(['add', '-A'], repo);
+  git(['commit', '-m', 'docs: refresh walkthrough'], repo);
+  const head = git(['rev-parse', 'HEAD'], repo);
+  assert.notEqual(head, stamped);
+
+  const fresh = wt(['check'], repo);
+  assert.equal(fresh.status, 0, fresh.out);
+  assert.equal(fresh.out.trim(), `FRESH ${stamped.slice(0, 10)} (HEAD ${head.slice(0, 10)} differs only under docs/walkthrough)`);
+
+  // a code change on top is stale again, even though the walkthrough commit sits between
+  fs.writeFileSync(path.join(repo, 'apps/x/main.ts'), 'export const x = 2\n');
+  git(['add', '-A'], repo);
+  git(['commit', '-m', 'code change'], repo);
+  assert.equal(wt(['check'], repo).status, 1);
+});
+
 test('refresh lists authored citations that no longer resolve', () => {
   const repo = fixture();
   assert.equal(wt(['init'], repo).status, 0);

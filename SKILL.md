@@ -116,6 +116,12 @@ Publishing is repo- and host-specific on purpose; the skill does not guess.
 - The stamp lives in `docs/walkthrough/manifest.json`: root sha, short sha,
   branch, dirty flag, refresh time in UTC and local time, and every submodule
   pin with its depth.
+- The commit that records a refresh necessarily moves `HEAD` past the stamp.
+  `check` therefore treats `HEAD` as fresh when every difference between the
+  stamped commit and `HEAD` lies under `docs/walkthrough/`, and says so:
+  `FRESH <stamped> (HEAD <short> differs only under docs/walkthrough)`. For
+  the same reason `dirty` ignores uncommitted changes under `docs/walkthrough/`
+  — the walkthrough is not the code it describes.
 - `check` is the gate. Wire `walkthrough:check` into CI or a pre-publish step
   when a repository cares that its walkthrough tracks `HEAD`.
 - A stale site is still useful and still builds; the footer is what makes it
