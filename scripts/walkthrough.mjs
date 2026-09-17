@@ -1147,6 +1147,16 @@ export function main(argv) {
   }
 }
 
-const invokedDirectly =
-  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+// Node resolves the main module through symlinks, so import.meta.url is the
+// realpath while process.argv[1] is whatever the caller typed (for example a
+// ~/.agents/skills/walkthrough symlink). Compare realpaths or a symlinked
+// invocation silently does nothing.
+const invokedDirectly = (() => {
+  if (!process.argv[1]) return false;
+  try {
+    return fs.realpathSync(fileURLToPath(import.meta.url)) === fs.realpathSync(process.argv[1]);
+  } catch {
+    return false;
+  }
+})();
 if (invokedDirectly) process.exit(main(process.argv.slice(2)));
