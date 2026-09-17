@@ -105,9 +105,11 @@ Publishing is repo- and host-specific on purpose; the skill does not guess.
    static output — a docs-site content directory, an object-storage prefix, a
    static tier's document root. The harness, repository conventions or the
    operator decides where; this skill does not.
-3. Verify the **served** page, not the local build: open it and confirm the
-   footer shows the short SHA you just built from and the expected branch. If it
-   shows an older SHA, the copy step or a cache — not the generator — is wrong.
+3. Verify the **served** site, not the local build: fetch `<base>manifest.json`
+   (`build` copies the stamp into the dist root) and compare `root.sha` with the
+   commit you built from; then open a page and confirm the footer agrees. If
+   either shows an older SHA, the copy step or a cache — not the generator — is
+   wrong.
 
 ## Staleness rules
 

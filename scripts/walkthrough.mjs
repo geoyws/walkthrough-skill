@@ -1074,7 +1074,14 @@ function runVitepress(repo, argv) {
 function cmdBuild(repo, args) {
   const base = resolveBase(repo, args);
   cmdCheck(repo);
-  return runVitepress(repo, ['build', SITE, '--base', base]);
+  const status = runVitepress(repo, ['build', SITE, '--base', base]);
+  if (status !== 0) return status;
+  // Publish the stamp beside the pages: a host that serves this dist answers
+  // `<base>manifest.json`, which is how a deploy proves WHICH commit is live
+  // without scraping the footer.
+  const dist = path.join(repo, SITE, '.vitepress/dist');
+  fs.copyFileSync(path.join(repo, SITE, 'manifest.json'), path.join(dist, 'manifest.json'));
+  return 0;
 }
 
 // `localhost` rather than the loopback literal: same binding, and this file
